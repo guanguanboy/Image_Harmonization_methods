@@ -1,3 +1,4 @@
+from lib2to3.pytree import convert
 import os.path
 import torch
 import torchvision.transforms.functional as tf
@@ -43,14 +44,15 @@ class HDay2nightDataset(BaseDataset):
             self.trainfile = opt.dataset_root+'Hday2night_train.txt' #修改点1，替换HCOCO_train.txt
             with open(self.trainfile,'r') as f:
                     for line in f.readlines():
-                        self.image_paths.append(os.path.join(opt.dataset_root, 'composite_images', line.rstrip())) #修改点2，增加composite_images，如果是带噪声的训练，将这里修改为composite_noisy25_images
+                        self.image_paths.append(os.path.join(opt.dataset_root, 'composite_noisy25_images', line.rstrip())) #修改点2，增加composite_images，如果是带噪声的训练，将这里修改为composite_noisy25_images
         elif opt.isTrain==False:
             print('loading test file')
             self.trainfile = opt.dataset_root+'Hday2night_test.txt' #修改点3， 替换HCOCO_test
             with open(self.trainfile,'r') as f:
                     for line in f.readlines():
-                        self.image_paths.append(os.path.join(opt.dataset_root, 'composite_images', line.rstrip())) #修改点4，如果是带噪声的训练，将这里修改为composite_noisy25_images
+                        self.image_paths.append(os.path.join(opt.dataset_root, 'composite_noisy25_images', line.rstrip())) #修改点4，如果是带噪声的训练，将这里修改为composite_noisy25_images
         self.transform = get_transform(opt)
+        self.mask_transform = get_transform(opt, convert=False)
 
     def __getitem__(self, index):
         """Return a data point and its metadata information.
@@ -68,9 +70,9 @@ class HDay2nightDataset(BaseDataset):
         """
         path = self.image_paths[index]
         name_parts=path.split('_')
-        mask_path = self.image_paths[index].replace('composite_images','masks')
+        mask_path = self.image_paths[index].replace('composite_noisy25_images','masks') # #修改点5，如果是带噪声的训练，将这里修改为composite_noisy25_images
         mask_path = mask_path.replace(('_'+name_parts[-1]),'.png')
-        target_path = self.image_paths[index].replace('composite_images','real_images')
+        target_path = self.image_paths[index].replace('composite_noisy25_images','real_images') # #修改点6，如果是带噪声的训练，将这里修改为composite_noisy25_images
         target_path = target_path.replace(('_'+name_parts[-2]+'_'+name_parts[-1]),'.jpg')
 
         comp = Image.open(path).convert('RGB')
@@ -79,11 +81,14 @@ class HDay2nightDataset(BaseDataset):
 
         comp = tf.resize(comp, [256, 256])
         mask = tf.resize(mask, [256, 256])
+        #mask = tf.resize(mask, [224, 224]) #对MAE训练，需要将这里修改为224,224
         real = tf.resize(real,[256,256])
 
         #apply the same transform to composite and real images
         comp = self.transform(comp)
+        mask = self.mask_transform(mask)
         mask = tf.to_tensor(mask)
+
         real = self.transform(real)
         #concate the composite and mask as the input of generator
         inputs=torch.cat([comp,mask],0)

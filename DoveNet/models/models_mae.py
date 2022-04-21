@@ -16,6 +16,9 @@ import torch.nn as nn
 
 from timm.models.vision_transformer import PatchEmbed, Block
 
+import sys
+sys.path.append("..")
+
 from util.pos_embed import get_2d_sincos_pos_embed
 
 
@@ -171,14 +174,16 @@ class MaskedAutoencoderViT(nn.Module):
 
     def forward_decoder(self, x, ids_restore): #x是编码器的输出
         # embed tokens
+        print('decoder input shape:', x.shape)
         x = self.decoder_embed(x) #为了将encoder输出的embeeding的维度，降维到encdoer的输入的维度
-
+        print('deocoder embed x shape:', x.shape)
         # append mask tokens to sequence
         mask_tokens = self.mask_token.repeat(x.shape[0], ids_restore.shape[1] + 1 - x.shape[1], 1) #ids_restore.shape[1] + 1 - x.shape[1] 其实是ids_restore.shape[1] -（ x.shape[1] - 1）其中1表示的是class token， ids_restore.shape[1] 表示全部token数目，x.shape[1]表示未被淹掉的token的数目
         x_ = torch.cat([x[:, 1:, :], mask_tokens], dim=1)  # no cls token ，将x和mask token拼接起来，
         x_ = torch.gather(x_, dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x.shape[2]))  # unshuffle，被还原顺序后的token
         x = torch.cat([x[:, :1, :], x_], dim=1)  # append cls token ，加上cls token。
 
+        print('x gather shape:', x.shape)
         # add pos embed
         x = x + self.decoder_pos_embed
 
@@ -250,13 +255,13 @@ mae_vit_large_patch16 = mae_vit_large_patch16_dec512d8b  # decoder: 512 dim, 8 b
 mae_vit_huge_patch14 = mae_vit_huge_patch14_dec512d8b  # decoder: 512 dim, 8 blocks
 
 def test_mae():
-    device = device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu')
+    device = device = torch.device('cuda:3' if torch.cuda.is_available() else 'cpu')
     my_mae = mae_vit_base_patch16().to(device)
     #print(my_mae)
 
     input_tensor = torch.rand(64, 3, 224, 224, device=device)
     loss, pred, mask = my_mae(input_tensor)
-    print(pred.shape) 
+    print(pred.shape) #torch.Size([64, 196, 768]) 196是patch个数，768是patch的特征。
 
 if __name__ == '__main__':
     test_mae()

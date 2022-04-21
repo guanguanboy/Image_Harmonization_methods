@@ -6,7 +6,7 @@ from PIL import Image
 import numpy as np
 import torchvision.transforms as transforms
 
-class HFlickrDataset(BaseDataset):
+class HDay2nightDataset(BaseDataset):
     """A template dataset class for you to implement custom datasets."""
     @staticmethod
     def modify_commandline_options(parser, is_train):
@@ -38,20 +38,18 @@ class HFlickrDataset(BaseDataset):
         BaseDataset.__init__(self, opt)
         self.image_paths = []
         self.isTrain = opt.isTrain
-        self.composite_imgs_folder_name = 'composite_noisy25_images'
-
         if opt.isTrain==True:
             print('loading training file: ')
-            self.trainfile = opt.dataset_root+'HFlickr_train.txt' #修改点1，替换HCOCO_train.txt
+            self.trainfile = opt.dataset_root+'Hday2night_train.txt' #修改点1，替换HCOCO_train.txt
             with open(self.trainfile,'r') as f:
                     for line in f.readlines():
-                        self.image_paths.append(os.path.join(opt.dataset_root, self.composite_imgs_folder_name, line.rstrip())) #修改点2，增加composite_images
+                        self.image_paths.append(os.path.join(opt.dataset_root, 'composite_images', line.rstrip())) #修改点2，增加composite_images，如果是带噪声的训练，将这里修改为composite_noisy25_images
         elif opt.isTrain==False:
             print('loading test file')
-            self.trainfile = opt.dataset_root+'HFlickr_test.txt' #修改点3， 替换HCOCO_test
+            self.trainfile = opt.dataset_root+'Hday2night_test.txt' #修改点3， 替换HCOCO_test
             with open(self.trainfile,'r') as f:
                     for line in f.readlines():
-                        self.image_paths.append(os.path.join(opt.dataset_root, self.composite_imgs_folder_name, line.rstrip())) #修改点4，
+                        self.image_paths.append(os.path.join(opt.dataset_root, 'composite_images', line.rstrip())) #修改点4，如果是带噪声的训练，将这里修改为composite_noisy25_images
         self.transform = get_transform(opt)
 
     def __getitem__(self, index):
@@ -70,9 +68,9 @@ class HFlickrDataset(BaseDataset):
         """
         path = self.image_paths[index]
         name_parts=path.split('_')
-        mask_path = self.image_paths[index].replace(self.composite_imgs_folder_name,'masks')
+        mask_path = self.image_paths[index].replace('composite_images','masks')
         mask_path = mask_path.replace(('_'+name_parts[-1]),'.png')
-        target_path = self.image_paths[index].replace(self.composite_imgs_folder_name,'real_images')
+        target_path = self.image_paths[index].replace('composite_images','real_images')
         target_path = target_path.replace(('_'+name_parts[-2]+'_'+name_parts[-1]),'.jpg')
 
         comp = Image.open(path).convert('RGB')
