@@ -764,29 +764,9 @@ class SwinIREncoder(nn.Module):
 
         #####################################################################################################
         ################################ 3, high quality image reconstruction ################################
-        if self.upsampler == 'pixelshuffle':
-            # for classical SR
-            self.conv_before_upsample = nn.Sequential(nn.Conv2d(embed_dim, num_feat, 3, 1, 1),
-                                                      nn.LeakyReLU(inplace=True))
-            self.upsample = Upsample(upscale, num_feat)
-            self.conv_last = nn.Conv2d(num_feat, num_out_ch, 3, 1, 1)
-        elif self.upsampler == 'pixelshuffledirect':
-            # for lightweight SR (to save parameters)
-            self.upsample = UpsampleOneStep(upscale, embed_dim, num_out_ch,
-                                            (patches_resolution[0], patches_resolution[1]))
-        elif self.upsampler == 'nearest+conv':
-            # for real-world SR (less artifacts)
-            assert self.upscale == 4, 'only support x4 now.'
-            self.conv_before_upsample = nn.Sequential(nn.Conv2d(embed_dim, num_feat, 3, 1, 1),
-                                                      nn.LeakyReLU(inplace=True))
-            self.conv_up1 = nn.Conv2d(num_feat, num_feat, 3, 1, 1)
-            self.conv_up2 = nn.Conv2d(num_feat, num_feat, 3, 1, 1)
-            self.conv_hr = nn.Conv2d(num_feat, num_feat, 3, 1, 1)
-            self.conv_last = nn.Conv2d(num_feat, num_out_ch, 3, 1, 1)
-            self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
-        else:
-            # for image denoising and JPEG compression artifact reduction
-            self.conv_last = nn.Conv2d(embed_dim, num_out_ch, 3, 1, 1)
+
+        # for image denoising and JPEG compression artifact reduction
+        self.conv_last = nn.Conv2d(embed_dim, num_out_ch, 3, 1, 1)
 
         self.apply(self._init_weights)
 
@@ -825,39 +805,15 @@ class SwinIREncoder(nn.Module):
         return x
 
     def forward(self, x):
-        self.mean = self.mean.type_as(x)
-        x = (x - self.mean) * self.img_range
+        #self.mean = self.mean.type_as(x)
+        #x = (x - self.mean) * self.img_range
 
-        if self.upsampler == 'pixelshuffle':
-            # for classical SR
-            x = self.conv_first(x)
-            x = self.conv_after_body(self.forward_features(x)) + x
-            x = self.conv_before_upsample(x)
-            x = self.conv_last(self.upsample(x))
-        elif self.upsampler == 'pixelshuffledirect':
-            # for lightweight SR
-            x = self.conv_first(x) #torch.Size([2, 60, 264, 184])
-            swin_ir_encoded_feature = self.forward_features(x)
-            #print('swin_ir_encoded_feature.shape =', swin_ir_encoded_feature.shape)
-            #x = self.conv_after_body(self.forward_features(x)) + x
-            #x = self.upsample(x)
-            x = swin_ir_encoded_feature
-        elif self.upsampler == 'nearest+conv':
-            # for real-world SR
-            x = self.conv_first(x)
-            x = self.conv_after_body(self.forward_features(x)) + x
-            x = self.conv_before_upsample(x)
-            x = self.lrelu(self.conv_up1(torch.nn.functional.interpolate(x, scale_factor=2, mode='nearest')))
-            x = self.lrelu(self.conv_up2(torch.nn.functional.interpolate(x, scale_factor=2, mode='nearest')))
-            x = self.conv_last(self.lrelu(self.conv_hr(x)))
-        else:
-            # for image denoising and JPEG compression artifact reduction
-            x_first = self.conv_first(x)
-            swin_ir_encoded_feature = self.forward_features(x_first)
-            #print('swin_ir_encoded_feature.shape =', swin_ir_encoded_feature.shape)
-            res = self.conv_after_body(swin_ir_encoded_feature) + x_first
-
-            x = x + self.conv_last(res)
+        # for image denoising and JPEG compression artifact reduction
+        x_first = self.conv_first(x)
+        swin_ir_encoded_feature = self.forward_features(x_first)
+        #print('swin_ir_encoded_feature.shape =', swin_ir_encoded_feature.shape)
+        x = self.conv_after_body(swin_ir_encoded_feature) + x_first
+        #print('none branch')
 
         #x = x / self.img_range + self.mean
 
@@ -871,7 +827,7 @@ class SwinIREncoder(nn.Module):
         for i, layer in enumerate(self.layers):
             flops += layer.flops()
         flops += H * W * 3 * self.embed_dim * self.embed_dim
-        flops += self.upsample.flops()
+        #flops += self.upsample.flops()
         return flops
 
 def rstb_test():
@@ -900,7 +856,7 @@ if __name__ == '__main__':
     width = 20
     model = SwinIREncoder(upscale=1, img_size=(height, width),
                    window_size=window_size, img_range=1., depths=[6, 6, 6, 6],
-                   embed_dim=60, num_heads=[6, 6, 6, 6], mlp_ratio=2, upsampler='pixelshuffledirect')
+                   embed_dim=60, num_heads=[6, 6, 6, 6], mlp_ratio=2, upsampler='none')
     #print(model)
     print(height, width, model.flops() / 1e9)
 

@@ -818,7 +818,7 @@ class SwinIR(nn.Module):
             x = layer(x, x_size)
 
         x = self.norm(x)  # B L C
-        print('before patch_unembed x.shape=', x.shape)
+        #print('before patch_unembed x.shape=', x.shape)
         
         x = self.patch_unembed(x, x_size)
 
@@ -838,7 +838,7 @@ class SwinIR(nn.Module):
             # for lightweight SR
             x = self.conv_first(x) #torch.Size([2, 60, 264, 184])
             swin_ir_encoded_feature = self.forward_features(x)
-            print('swin_ir_encoded_feature.shape =', swin_ir_encoded_feature.shape)
+            #print('swin_ir_encoded_feature.shape =', swin_ir_encoded_feature.shape)
             x = self.conv_after_body(self.forward_features(x)) + x
             x = self.upsample(x)
         elif self.upsampler == 'nearest+conv':
@@ -853,7 +853,7 @@ class SwinIR(nn.Module):
             # for image denoising and JPEG compression artifact reduction
             x_first = self.conv_first(x)
             swin_ir_encoded_feature = self.forward_features(x_first)
-            print('swin_ir_encoded_feature.shape =', swin_ir_encoded_feature.shape)
+            #print('swin_ir_encoded_feature.shape =', swin_ir_encoded_feature.shape)
             res = self.conv_after_body(swin_ir_encoded_feature) + x_first
 
             x = x + self.conv_last(res)

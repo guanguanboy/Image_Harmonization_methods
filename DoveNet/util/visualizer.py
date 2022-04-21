@@ -190,8 +190,7 @@ class Visualizer():
         self.plot_data['Y'].append([losses[k] for k in self.plot_data['legend']])
         X=np.stack([np.array(self.plot_data['X'])] * len(self.plot_data['legend']), 1)
         Y=np.array(self.plot_data['Y'])
-        print('len of x:', X.shape)
-        print('len of Y:', Y.shape)
+
         try:
             self.vis.line(
                 X=X,

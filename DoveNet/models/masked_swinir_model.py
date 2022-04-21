@@ -1,4 +1,3 @@
-from sympy import im
 import torch
 from .base_model import BaseModel
 from . import networks
@@ -7,10 +6,10 @@ from torch import device, nn, cuda
 from torch.autograd import Variable
 import functools
 from torch.nn.utils import spectral_norm
-from .network_swinir_encoder import *
-from .light_learner import *
+from .network_swinir import *
 
-class SwinHarmonyModel(BaseModel):
+
+class MaskedSwinIrModel(BaseModel):
     
 
     @staticmethod
@@ -53,31 +52,25 @@ class SwinHarmonyModel(BaseModel):
         else:  # during test time, only load G
             self.model_names = ['G']
 
-        window_size = 4
+        window_size = 4 #原始SwinIR设置是8
         height = width = 20
-        self.netG = SwinIREncoder(upscale=1, img_size=(height, width),
-                   window_size=window_size, img_range=1., depths=[6, 6, 6, 6],
-                   embed_dim=60, num_heads=[6, 6, 6, 6], mlp_ratio=2, upsampler='none')
+        self.netG = SwinIR(upscale=1, img_size=(height, width),
+                   window_size=window_size, img_range=1., depths=[2, 2, 2, 2],
+                   embed_dim=60, num_heads=[6, 6, 6, 6], mlp_ratio=2, upsampler='pixelshuffledirect')
         self.netG = networks.init_net(self.netG, opt.init_type, opt.init_gain, self.gpu_ids)
         
-        self.light_learner = GlobalLighting(n_downsample=0, input_dim=4, dim=64, norm='none',activ = 'lrelu', pad_type = 'reflect')
-        self.light_learner = networks.init_net(self.light_learner, opt.init_type, opt.init_gain, self.gpu_ids) 
-        self.light_transfer = LightingResBlocks(num_blocks=4, dim=60,light_mlp_dim=8, norm='ln')
-        self.light_transfer = networks.init_net(self.light_transfer, opt.init_type, opt.init_gain, self.gpu_ids) 
-
         self.relu = nn.ReLU()
 
         if self.isTrain:
             # define loss functions
             self.criterionL1 = torch.nn.L1Loss()
             self.mse = torch.nn.MSELoss()
+
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
             self.optimizer_G = torch.optim.Adam(self.netG.parameters(), lr=opt.lr*opt.g_lr_ratio,
                                                 betas=(opt.beta1, 0.999))
             self.optimizers.append(self.optimizer_G)
             self.iter_cnt = 0        
-
-        self.conv_last = nn.Conv2d(60, 3, 3, 1, 1).to(self.gpu_ids[0])
 
     def set_input(self, input):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.
@@ -94,23 +87,20 @@ class SwinHarmonyModel(BaseModel):
 
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
-        self.denoising_encoded_feature = self.netG(self.comp)
-        #print('self.comp.shape=', self.comp.shape)
+        masked_area = self.comp * self.mask
+        self.output= self.netG(masked_area)
+        #print('self.output.shape=', self.output.shape)
         #print('self.mask.shape=', self.mask.shape)
-        fg_pooling, bg_pooling = self.light_learner(self.inputs, self.mask)
-
-        transfered_feature = self.light_transfer(self.denoising_encoded_feature, fg_pooling, bg_pooling, self.mask)
-        #self.output = self.conv_last(transfered_feature)
-        self.output = self.conv_last(self.denoising_encoded_feature)
         self.fake_f = self.output * self.mask
         self.cap = self.output * self.mask + self.comp * (1 - self.mask)
-        self.harmonized = self.output
+        self.harmonized = self.cap
 
     def backward_G(self):
         """Calculate GAN and L1 loss for the generator"""
+        real_f =  self.real * self.mask
+        self.loss_G_L1 = self.criterionL1(self.fake_f, real_f)
+        self.loss_G_L2 = self.mse(self.fake_f, real_f)
 
-        self.loss_G_L1 = self.criterionL1(self.output, self.real) * self.opt.lambda_L1
-        self.loss_G_L2 = self.mse(self.output, self.real) * self.opt.lambda_L1
         self.loss_G = self.loss_G_L1
         self.loss_G.backward(retain_graph=True)
 

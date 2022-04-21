@@ -86,7 +86,7 @@ class HDay2nightDataset(BaseDataset):
 
         #apply the same transform to composite and real images
         comp = self.transform(comp)
-        mask = self.mask_transform(mask)
+        #mask = self.mask_transform(mask)
         mask = tf.to_tensor(mask)
 
         real = self.transform(real)

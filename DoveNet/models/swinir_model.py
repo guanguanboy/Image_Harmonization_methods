@@ -43,7 +43,7 @@ class SwinIrModel(BaseModel):
         BaseModel.__init__(self, opt)
 
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
-        self.loss_names = ['G_L1']
+        self.loss_names = ['G_L1', 'G_L2']
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
         self.visual_names = ['comp', 'real', 'cap', 'output', 'mask', 'real_f', 'fake_f', 'bg']
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>
@@ -64,6 +64,8 @@ class SwinIrModel(BaseModel):
         if self.isTrain:
             # define loss functions
             self.criterionL1 = torch.nn.L1Loss()
+            self.mse = torch.nn.MSELoss()
+
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
             self.optimizer_G = torch.optim.Adam(self.netG.parameters(), lr=opt.lr*opt.g_lr_ratio,
                                                 betas=(opt.beta1, 0.999))
@@ -94,8 +96,9 @@ class SwinIrModel(BaseModel):
 
     def backward_G(self):
         """Calculate GAN and L1 loss for the generator"""
-
         self.loss_G_L1 = self.criterionL1(self.output, self.real) * self.opt.lambda_L1
+        self.loss_G_L2 = self.mse(self.output, self.real) * self.opt.lambda_L1
+
         self.loss_G = self.loss_G_L1
         self.loss_G.backward(retain_graph=True)
 
