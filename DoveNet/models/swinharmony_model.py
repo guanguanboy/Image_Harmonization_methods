@@ -65,8 +65,6 @@ class SwinHarmonyModel(BaseModel):
         self.light_transfer = LightingResBlocks(num_blocks=4, dim=60,light_mlp_dim=8, norm='ln')
         self.light_transfer = networks.init_net(self.light_transfer, opt.init_type, opt.init_gain, self.gpu_ids) 
 
-        self.relu = nn.ReLU()
-
         if self.isTrain:
             # define loss functions
             self.criterionL1 = torch.nn.L1Loss()
@@ -77,7 +75,7 @@ class SwinHarmonyModel(BaseModel):
             self.optimizers.append(self.optimizer_G)
             self.iter_cnt = 0        
 
-        self.conv_last = nn.Conv2d(60, 3, 3, 1, 1).to(self.gpu_ids[0])
+        #self.conv_last = nn.Conv2d(60, 3, 3, 1, 1).to(self.gpu_ids[0])
 
     def set_input(self, input):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.
@@ -94,14 +92,13 @@ class SwinHarmonyModel(BaseModel):
 
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
-        self.denoising_encoded_feature = self.netG(self.comp)
+        self.output = self.netG(self.comp)
         #print('self.comp.shape=', self.comp.shape)
         #print('self.mask.shape=', self.mask.shape)
-        fg_pooling, bg_pooling = self.light_learner(self.inputs, self.mask)
+        #fg_pooling, bg_pooling = self.light_learner(self.inputs, self.mask)
 
-        transfered_feature = self.light_transfer(self.denoising_encoded_feature, fg_pooling, bg_pooling, self.mask)
+        #transfered_feature = self.light_transfer(self.denoising_encoded_feature, fg_pooling, bg_pooling, self.mask)
         #self.output = self.conv_last(transfered_feature)
-        self.output = self.conv_last(self.denoising_encoded_feature)
         self.fake_f = self.output * self.mask
         self.cap = self.output * self.mask + self.comp * (1 - self.mask)
         self.harmonized = self.output

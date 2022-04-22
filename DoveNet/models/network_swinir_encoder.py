@@ -816,7 +816,7 @@ class SwinIREncoder(nn.Module):
         #print('none branch')
 
         #x = x / self.img_range + self.mean
-
+        x= self.conv_last(x)
         return x
 
     def flops(self):
